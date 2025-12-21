@@ -14,10 +14,9 @@ const app = express();
 app.use(express.json());
 app.use(cookieParser());
 app.use(cors({
-  origin: 'http://localhost:5173', // Your React Frontend URL (default Vite port)
-  credentials: true // Important for cookies
+  origin: '*', // Allow all connections for the demo
+  credentials: true,
 }));
-
 // Placeholder Routes (We will create these files next)
 app.use('/api/auth', require('./routes/authroutes'));
 app.use('/api/books', require('./routes/bookroutes'));
@@ -32,5 +31,7 @@ const dirname = path.resolve();
 app.use('/uploads', express.static(path.join(dirname, '/uploads')));
 
 const PORT = process.env.PORT || 5000;
+
+
 
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
