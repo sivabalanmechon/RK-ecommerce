@@ -36,23 +36,56 @@ exports.getUserProfile = async (req, res) => {
 // @route   POST /api/users/cart
 // @access  Private
 exports.addToCart = async (req, res) => {
-  const { bookId } = req.body;
   try {
+    console.log("1. AddToCart Request Body:", req.body); // Check if bookId exists
+    const { bookId } = req.body;
+
+    // Check if bookId is valid
+    if (!bookId) {
+      console.log("❌ Error: bookId is missing from request body");
+      return res.status(400).json({ message: "Book ID is required" });
+    }
+
+    console.log("2. User from Request (req.user):", req.user);
+    // Ensure req.user exists (Middleware should handle this, but let's be safe)
+    if (!req.user || !req.user._id) {
+       console.log("❌ Error: req.user is missing. Auth Middleware might have failed.");
+       return res.status(401).json({ message: "User not authenticated correctly" });
+    }
+
+    // Fetch fresh user data
     const user = await User.findById(req.user._id);
-    
+
+    if (!user) {
+      console.log("❌ Error: User not found in database with ID:", req.user._id);
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Initialize cart if it doesn't exist (Fixes crash on old users)
+    if (!user.cart) {
+      user.cart = [];
+    }
+
     // Check if already in cart
-    const exists = user.cart.find((item) => item.book == bookId);
+    // We use String() to ensure we are comparing strings, not Objects vs Strings
+    const exists = user.cart.find((item) => String(item.book) === String(bookId));
 
     if (exists) {
+      console.log("⚠️ Item already in cart");
       return res.status(400).json({ message: 'Item already in cart' });
     }
 
+    // Push new item
     user.cart.push({ book: bookId });
     await user.save();
     
+    // Populate and return
     const updatedUser = await user.populate('cart.book');
+    console.log("✅ Success! Cart updated.");
     res.json(updatedUser.cart);
+
   } catch (error) {
+    console.error("❌ CRITICAL SERVER ERROR:", error);
     res.status(500).json({ message: error.message });
   }
 };
