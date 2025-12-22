@@ -5,7 +5,7 @@ const SystemSetting = require('../models/Systemsettings');
 
 // Generate JWT Token
 // Inside your token generation function
-const generateToken = (res, userId) => {
+exports.generateToken = (res, userId) => {
   const token = jwt.sign({ userId }, process.env.JWT_SECRET, {
     expiresIn: "30d",
   });
@@ -19,7 +19,7 @@ const generateToken = (res, userId) => {
   });
 };
 
-export default generateToken;
+
 
 // @desc    Register new user
 // @route   POST /api/auth/register
