@@ -1,31 +1,43 @@
 const jwt = require('jsonwebtoken');
+const asyncHandler = require('./asyncHandler');
 const User = require('../models/User');
 
-// 1. Protect Routes (Must be logged in)
-exports.protect = async (req, res, next) => {
+const protect = asyncHandler(async (req, res, next) => {
   let token;
 
-  // Read token from the HTTP-Only cookie
+  // Read the JWT from the cookie
   token = req.cookies.jwt;
 
   if (token) {
     try {
+      // Verify token
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      req.user = await User.findById(decoded.id).select('-password');
+      
+      // Get user from the token
+      req.user = await User.findById(decoded.userId).select('-password');
+      
       next();
     } catch (error) {
-      res.status(401).json({ message: 'Not authorized, token failed' });
+      console.error(error);
+      res.status(401);
+      throw new Error('Not authorized, token failed');
     }
   } else {
-    res.status(401).json({ message: 'Not authorized, no token' });
+    // Debugging: Log if token is missing
+    // console.log("No Token Found in Request Cookies"); 
+    res.status(401);
+    throw new Error('Not authorized, no token');
   }
-};
+});
 
-// 2. Admin Only (Must have role 'admin')
-exports.admin = (req, res, next) => {
+// Admin middleware
+const admin = (req, res, next) => {
   if (req.user && req.user.role === 'admin') {
     next();
   } else {
-    res.status(401).json({ message: 'Not authorized as an admin' });
+    res.status(401);
+    throw new Error('Not authorized as admin');
   }
 };
+
+module.exports = { protect, admin };
