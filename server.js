@@ -14,9 +14,14 @@ const app = express();
 app.use(express.json());
 app.use(cookieParser());
 app.use(cors({
-  origin: '*', // Allow all connections for the demo
-  credentials: true,
+  // 👇 REPLACE '*' WITH YOUR EXACT NETLIFY LINK (NO SLASH AT THE END)
+  origin: [
+    "https://rk-ecommerce.netlify.app", 
+    "http://localhost:5173" // Keep localhost so you can still test on your computer
+  ],
+  credentials: true, // This allows cookies to be sent
 }));
+
 // Placeholder Routes (We will create these files next)
 app.use('/api/auth', require('./routes/authroutes'));
 app.use('/api/books', require('./routes/bookroutes'));
