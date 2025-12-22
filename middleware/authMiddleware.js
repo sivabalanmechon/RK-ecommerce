@@ -5,17 +5,18 @@ const User = require('../models/User');
 const protect = asyncHandler(async (req, res, next) => {
   let token;
 
-  // Read the JWT from the cookie
+  // 1. Check Cookies
   token = req.cookies.jwt;
+
+  // 2. If no cookie, Check Authorization Header (Bearer Token)
+  if (!token && req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+      token = req.headers.authorization.split(' ')[1];
+  }
 
   if (token) {
     try {
-      // Verify token
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      
-      // Get user from the token
       req.user = await User.findById(decoded.userId).select('-password');
-      
       next();
     } catch (error) {
       console.error(error);
@@ -23,14 +24,12 @@ const protect = asyncHandler(async (req, res, next) => {
       throw new Error('Not authorized, token failed');
     }
   } else {
-    // Debugging: Log if token is missing
-    // console.log("No Token Found in Request Cookies"); 
     res.status(401);
     throw new Error('Not authorized, no token');
   }
 });
 
-// Admin middleware
+// ... admin middleware remains the same ...
 const admin = (req, res, next) => {
   if (req.user && req.user.role === 'admin') {
     next();

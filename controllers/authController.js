@@ -3,19 +3,21 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const SystemSetting = require('../models/Systemsettings');
 
-// 👇 1. Define Helper Function correctly (Internal use)
+// 👇 1. INTERNAL HELPER FUNCTION (Local only, no module.exports needed)
 const generateToken = (res, userId) => {
   const token = jwt.sign({ userId }, process.env.JWT_SECRET, {
     expiresIn: "30d",
   });
 
-  // Set Cookie with Cross-Site settings (Render + Netlify support)
+  // Set cookie as backup (for secure browser sessions)
   res.cookie("jwt", token, {
     httpOnly: true,
-    secure: true,       // ✅ Always True for Render/Netlify
-    sameSite: "None",   // ✅ Required for Cross-Site
-    maxAge: 30 * 24 * 60 * 60 * 1000, // 30 Days
+    secure: true,
+    sameSite: "None",
+    maxAge: 30 * 24 * 60 * 60 * 1000,
   });
+
+  return token; // Returns the token string so we can use it below
 };
 
 // @desc    Register new user
@@ -42,16 +44,17 @@ exports.registerUser = async (req, res) => {
     });
 
     if (user) {
-      // 👇 2. Call the helper function correctly (Pass 'res' and 'id')
-      generateToken(res, user._id);
+      // 👇 Capture the token here
+      const token = generateToken(res, user._id);
 
       res.status(201).json({
         _id: user._id,
         name: user.name,
         email: user.email,
-        mobile: user.mobile, 
+        mobile: user.mobile,
         role: user.role,
-        cart: user.cart
+        cart: user.cart,
+        token: token // ✅ Send token to Frontend
       });
     } else {
       res.status(400).json({ message: 'Invalid user data' });
@@ -78,8 +81,8 @@ exports.loginUser = async (req, res) => {
 
     if (user && (await bcrypt.compare(password, user.password))) {
       
-      // 👇 3. Call helper here too. No need to duplicate cookie code!
-      generateToken(res, user._id);
+      // 👇 FIXED: Capture the token in a variable!
+      const token = generateToken(res, user._id); 
 
       res.json({
         _id: user._id,
@@ -87,7 +90,8 @@ exports.loginUser = async (req, res) => {
         email: user.email,
         mobile: user.mobile,
         role: user.role,
-        cart: user.cart
+        cart: user.cart,
+        token: token // ✅ Now 'token' is defined and will work
       });
     } else {
       res.status(401).json({ message: 'Invalid email or password' });
@@ -101,12 +105,11 @@ exports.loginUser = async (req, res) => {
 // @route   POST /api/auth/logout
 // @access  Public
 exports.logoutUser = (req, res) => {
-  // Clear cookie with same settings
   res.cookie('jwt', '', {
     httpOnly: true,
     expires: new Date(0),
-    secure: true,      // ✅ Important to match creation settings
-    sameSite: "None",  // ✅ Important to match creation settings
+    secure: true,
+    sameSite: "None",
   });
   res.status(200).json({ message: 'Logged out successfully' });
 };
