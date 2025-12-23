@@ -45,7 +45,9 @@ exports.updateSiteSettings = async (req, res) => {
     settings.phone = phone;
     settings.email = email;
     settings.address = address;
-    settings.isLoginEnabled = isLoginEnabled;
+    if (typeof isLoginEnabled !== 'undefined') {
+        settings.isLoginEnabled = isLoginEnabled;
+    }
     
     // For nested objects like socialLinks, we ensure it's not undefined
     if (socialLinks) {
