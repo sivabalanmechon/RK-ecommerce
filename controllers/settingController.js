@@ -25,6 +25,8 @@ exports.getSiteSettings = async (req, res) => {
 // @route   PUT /api/settings
 // @access  Private/Admin
 exports.updateSiteSettings = async (req, res) => {
+  console.log("Received Body:", req.body); // 👈 Debugging Line
+
   const { 
     siteName, 
     logo, 
@@ -32,24 +34,31 @@ exports.updateSiteSettings = async (req, res) => {
     email, 
     address, 
     socialLinks,
-    isLoginEnabled 
+    // Extract BOTH possible names to be safe
+    isLoginEnabled, 
+    forceLogin 
   } = req.body;
 
   try {
     const settings = await getSettingsDoc();
 
-    // Update fields directly
-    // Note: We assign them directly so empty strings overwite old values (which is desired for clearing fields)
     settings.siteName = siteName;
     settings.logo = logo;
     settings.phone = phone;
     settings.email = email;
     settings.address = address;
-    if (typeof isLoginEnabled !== 'undefined') {
-        settings.isLoginEnabled = isLoginEnabled;
+
+    // --- CRITICAL FIX START ---
+    // 1. Check if we received the value under EITHER name
+    const incomingLoginStatus = isLoginEnabled !== undefined ? isLoginEnabled : forceLogin;
+
+    // 2. Explicitly check if it is defined before updating
+    if (incomingLoginStatus !== undefined) {
+        // 3. Force it to be a real Boolean (fixes the "false" string issue)
+        settings.isLoginEnabled = String(incomingLoginStatus) === 'true';
     }
-    
-    // For nested objects like socialLinks, we ensure it's not undefined
+    // --- CRITICAL FIX END ---
+
     if (socialLinks) {
         settings.socialLinks = {
             facebook: socialLinks.facebook || '',
@@ -59,6 +68,7 @@ exports.updateSiteSettings = async (req, res) => {
     }
 
     const updatedSettings = await settings.save();
+    console.log("Saved Settings:", updatedSettings); // 👈 Verify what was saved
     res.json(updatedSettings);
   } catch (error) {
     res.status(500).json({ message: error.message });
