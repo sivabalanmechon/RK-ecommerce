@@ -1,6 +1,7 @@
 const Order = require('../models/Order');
 const User = require('../models/User');
 const Book = require('../models/Book');
+const SampleDownload = require('../models/SampleDownload');
 
 // @desc    Get Admin Dashboard Stats
 // @route   GET /api/admin/stats
@@ -111,4 +112,23 @@ const getAdminStats = async (req, res) => {
   }
 };
 
-module.exports = { getAdminStats };
+// @desc    Get list of all sample downloads
+// @route   GET /api/admin/sample-downloads
+// @access  Private/Admin
+const getSampleDownloads = async (req, res) => {
+  try {
+    const downloads = await SampleDownload.find({})
+      // 👇 Key Step: Get User Profile Details
+      .populate('user', 'name email mobile profileImage') 
+      // Get Book Title (in case book name changed)
+      .populate('book', 'title coverImage') 
+      .sort({ downloadedAt: -1 }); // Newest first
+
+    res.json(downloads);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server Error' });
+  }
+};
+
+module.exports = { getAdminStats, getSampleDownloads };
