@@ -12,43 +12,45 @@ const getAdminStats = async (req, res) => {
     const totalOrders = await Order.countDocuments();
     const totalUsers = await User.countDocuments();
     const totalBooks = await Book.countDocuments();
+    
+    // 👇 2. NEW: Count Sample Downloads
+    const totalSampleDownloads = await SampleDownload.countDocuments(); 
 
-    // 2. Total Items in All Carts (Optimized Aggregation)
-    // Instead of loading all users, we let the database sum it up
-    const cartStats = await User.aggregate([
-      { $unwind: "$cart" },
-      { $group: { _id: null, totalItems: { $sum: "$cart.qty" } } }
-    ]);
-    const totalCartItems = cartStats.length > 0 ? cartStats[0].totalItems : 0;
+    // 3. Cart Items Aggregation
+    let totalCartItems = 0;
+    try {
+        const cartStats = await User.aggregate([
+            { $unwind: "$cart" },
+            { $group: { _id: null, totalItems: { $sum: "$cart.qty" } } }
+        ]);
+        totalCartItems = cartStats.length > 0 ? cartStats[0].totalItems : 0;
+    } catch (err) {
+        console.log("Cart Calc Error:", err.message);
+    }
 
-    // 3. Total Revenue (Paid Orders Only)
+    // 4. Revenue Calculations
     const totalRevenueResult = await Order.aggregate([
       { $match: { isPaid: true } },
       { $group: { _id: null, total: { $sum: '$totalPrice' } } },
     ]);
     const totalRevenue = totalRevenueResult.length > 0 ? totalRevenueResult[0].total : 0;
 
-    // 4. Yearly Revenue
+    // (Yearly/Monthly revenue logic remains the same...)
     const currentYear = new Date().getFullYear();
-    const startOfYear = new Date(currentYear, 0, 1);
-    
     const yearlyRevenueResult = await Order.aggregate([
-      { $match: { isPaid: true, createdAt: { $gte: startOfYear } }},
+      { $match: { isPaid: true, createdAt: { $gte: new Date(currentYear, 0, 1) } }},
       { $group: { _id: null, total: { $sum: '$totalPrice' } } },
     ]);
     const yearlyRevenue = yearlyRevenueResult.length > 0 ? yearlyRevenueResult[0].total : 0;
 
-    // 5. Monthly Revenue
     const currentMonth = new Date().getMonth();
-    const startOfMonth = new Date(currentYear, currentMonth, 1);
-    
     const monthlyRevenueResult = await Order.aggregate([
-      { $match: { isPaid: true, createdAt: { $gte: startOfMonth } }},
+      { $match: { isPaid: true, createdAt: { $gte: new Date(currentYear, currentMonth, 1) } }},
       { $group: { _id: null, total: { $sum: '$totalPrice' } } },
     ]);
     const monthlyRevenue = monthlyRevenueResult.length > 0 ? monthlyRevenueResult[0].total : 0;
 
-    // 6. Monthly Sales Graph Data
+    // 5. Monthly Sales Chart
     const monthlySales = await Order.aggregate([
       { $match: { isPaid: true } },
       {
@@ -61,44 +63,33 @@ const getAdminStats = async (req, res) => {
       { $limit: 6 }
     ]);
 
-    // 7. Book Analytics (Top Selling)
-    const bookAnalytics = await Order.aggregate([
-      { $match: { isPaid: true } },
-      { $unwind: '$orderItems' },
-      {
-        $group: {
-          _id: '$orderItems.book',
-          count: { $sum: '$orderItems.qty' }, // Fix: Sum quantity, not just count orders
-          revenue: { $sum: { $multiply: ['$orderItems.price', '$orderItems.qty'] } }
-        }
-      },
-      { $sort: { count: -1 } },
-      { $limit: 5 },
-      // Lookup book details directly
-      {
-        $lookup: {
-            from: 'books',
-            localField: '_id',
-            foreignField: '_id',
-            as: 'bookDetails'
-        }
-      },
-      { $unwind: '$bookDetails' },
-      {
-        $project: {
-            _id: '$bookDetails', // Matches frontend expectation
-            count: 1,
-            revenue: 1
-        }
-      }
-    ]);
+    // 6. Book Analytics
+    let bookAnalytics = [];
+    try {
+        bookAnalytics = await Order.aggregate([
+            { $match: { isPaid: true } },
+            { $unwind: '$orderItems' },
+            {
+                $group: {
+                    _id: '$orderItems.book',
+                    count: { $sum: '$orderItems.qty' },
+                    revenue: { $sum: { $multiply: ['$orderItems.price', '$orderItems.qty'] } }
+                }
+            },
+            { $sort: { count: -1 } },
+            { $limit: 5 }
+        ]);
+        await Book.populate(bookAnalytics, { path: '_id', select: 'title' });
+    } catch (err) {
+        console.log("Analytics Error:", err.message);
+    }
 
-    // Send Response
-    res.json({
+    res.status(200).json({
       totalOrders,
       totalUsers,
-      totalBooks,      // Ensure this matches frontend state
-      totalCartItems,  // Ensure this matches frontend state
+      totalBooks,
+      totalCartItems,
+      totalSampleDownloads, // 👈 Send this new stat
       totalRevenue,
       yearlyRevenue,
       monthlyRevenue,
@@ -107,10 +98,12 @@ const getAdminStats = async (req, res) => {
     });
 
   } catch (error) {
-    console.error("ADMIN STATS ERROR:", error);
+    console.error(error);
     res.status(500).json({ message: error.message });
   }
 };
+
+module.exports = { getAdminStats };
 
 // @desc    Get list of all sample downloads
 // @route   GET /api/admin/sample-downloads
