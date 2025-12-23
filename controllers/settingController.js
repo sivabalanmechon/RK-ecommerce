@@ -31,7 +31,8 @@ exports.updateSiteSettings = async (req, res) => {
     phone, 
     email, 
     address, 
-    socialLinks 
+    socialLinks,
+    isLoginEnabled 
   } = req.body;
 
   try {
@@ -44,6 +45,7 @@ exports.updateSiteSettings = async (req, res) => {
     settings.phone = phone;
     settings.email = email;
     settings.address = address;
+    settings.isLoginEnabled = isLoginEnabled;
     
     // For nested objects like socialLinks, we ensure it's not undefined
     if (socialLinks) {
