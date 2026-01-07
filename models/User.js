@@ -41,4 +41,16 @@ const userSchema = mongoose.Schema({
   timestamps: true,
 });
 
+// 1. Add this Virtual Field configuration
+userSchema.virtual('sampleDownloads', {
+  ref: 'SampleDownload', // Make sure this matches your Download Model name exactly
+  localField: '_id',     // The User's ID
+  foreignField: 'user',  // The field in Download model that links to user
+  justOne: false         // We want an array of downloads
+});
+
+// 2. Ensure Virtuals are included when converting to JSON
+userSchema.set('toJSON', { virtuals: true });
+userSchema.set('toObject', { virtuals: true });
+
 module.exports = mongoose.model('User', userSchema);

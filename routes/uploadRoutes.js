@@ -1,28 +1,47 @@
-// backend/routes/uploadRoutes.js
+const path = require('path');
 const express = require('express');
+const multer = require('multer');
+
 const router = express.Router();
-// Import the pre-configured upload middleware
-const upload = require('../config/cloudinary');
 
-// @desc    Upload file to Cloudinary
-// @route   POST /api/upload
-// @access  Public (or Private if you add auth middleware)
-router.post('/', upload.single('image'), (req, res) => {
-  try {
-    // Multer + Cloudinary have done the work.
-    // req.file contains information about the uploaded file in Cloudinary.
-    
-    console.log('File uploaded to Cloudinary:', req.file.path);
+// 1. Configure Local Storage
+const storage = multer.diskStorage({
+  destination(req, file, cb) {
+    cb(null, 'uploads/'); // Files will be saved in 'uploads' folder
+  },
+  filename(req, file, cb) {
+    // Save as: fieldname-date.pdf
+    cb(null, `${file.fieldname}-${Date.now()}${path.extname(file.originalname)}`);
+  },
+});
 
-    // We return the secure Cloudinary URL back to the frontend
-    res.send({
-      image: req.file.path, // .path holds the secure URL in cloudinary storage engine
-      message: 'File uploaded successfully'
-    });
-  } catch (error) {
-    console.error('Upload Error:', error);
-    res.status(500).send({ message: 'Upload failed' });
+// 2. Filter to allow only PDFs (Optional, but good for safety)
+function checkFileType(file, cb) {
+  const filetypes = /pdf/;
+  const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
+  const mimetype = filetypes.test(file.mimetype);
+
+  if (extname && mimetype) {
+    return cb(null, true);
+  } else {
+    cb('Error: PDFs Only!');
   }
+}
+
+const upload = multer({
+  storage,
+  // fileFilter: function (req, file, cb) { checkFileType(file, cb); }, // Uncomment to force PDF only
+});
+
+// 3. The Upload Route
+// Frontend will POST to /api/upload
+router.post('/', upload.single('image'), (req, res) => {
+  // We send back the PATH to the file
+  // Note: We add a leading slash so it's an absolute path relative to domain
+  res.send({
+    message: 'File Uploaded',
+    image: `/${req.file.path.replace(/\\/g, '/')}`, 
+  });
 });
 
 module.exports = router;

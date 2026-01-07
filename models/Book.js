@@ -30,6 +30,14 @@ const bookSchema = new mongoose.Schema({
   originalPrice: { type: Number, required: true }, 
   discountPercent: { type: Number, default: 0 },
   sellingPrice: { type: Number, required: true },
+  offerExpiresAt: {
+    type: Date,
+    required: false, // Optional: If not set, we won't show the timer
+  },
+  futurePrice: {
+    type: Number,
+    required: false, // Optional: The price displayed as "Price will be..."
+  },
 
   // Digital Product Logic (The Paid File)
   googleDriveFileId: { type: String, required: true }, 

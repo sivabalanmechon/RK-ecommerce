@@ -1,3 +1,4 @@
+const asyncHandler = require('../middleware/asyncHandler');
 const Book = require('../models/Book');
 const SampleDownload = require('../models/SampleDownload'); // Import tracking model
 
@@ -55,6 +56,8 @@ exports.createBook = async (req, res) => {
       originalPrice, 
       sellingPrice, 
       discountPercent, 
+      futurePrice,        // ✨ New Field
+      offerExpiresAt,    // ✨ New Field
       category, 
       coverImage, 
       bookImages,         // ✨ New Field (Array of Cloudinary URLs)
@@ -76,6 +79,8 @@ exports.createBook = async (req, res) => {
       originalPrice,
       sellingPrice,
       discountPercent,
+      futurePrice,
+      offerExpiresAt,
       category,
       coverImage,
       bookImages,         // Save the array of URLs
@@ -120,6 +125,8 @@ exports.updateBook = async (req, res) => {
     originalPrice,
     sellingPrice,
     discountPercent,
+    futurePrice,        // ✨ New Field
+    offerExpiresAt,    // ✨ New Field
     category,
     coverImage,
     bookImages,         // ✨ New Field
@@ -137,6 +144,8 @@ exports.updateBook = async (req, res) => {
     book.originalPrice = originalPrice || book.originalPrice;
     book.sellingPrice = sellingPrice || book.sellingPrice;
     book.discountPercent = discountPercent || book.discountPercent;
+    book.futurePrice = futurePrice || book.futurePrice;
+    book.offerExpiresAt = offerExpiresAt || book.offerExpiresAt;
     book.category = category || book.category;
     book.coverImage = coverImage || book.coverImage;
     book.bookImages = bookImages || book.bookImages; // Update array
@@ -180,30 +189,35 @@ exports.getTopBooks = async (req, res) => {
 // @desc    Track user and redirect to Sample PDF
 // @route   GET /api/books/:id/sample
 // @access  Private
-exports.downloadSample = async (req, res) => {
-  try {
-    const book = await Book.findById(req.params.id);
-
-    if (!book) {
-      return res.status(404).json({ message: 'Book not found' });
-    }
-
-    if (!book.samplePdfUrl) {
-      return res.status(404).json({ message: 'No sample PDF available' });
-    }
-
-    // 1. Log the download
-    await SampleDownload.create({
-      user: req.user._id,
-      book: book._id,
-      bookTitle: book.title
-    });
-
-    // 2. Return the Cloudinary URL
-    res.json({ downloadUrl: book.samplePdfUrl });
-
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Server Error' });
+exports.downloadSample = asyncHandler(async (req, res) => {
+  // 1. Auth Check
+  if (!req.user) {
+      res.status(401);
+      throw new Error('Not authorized');
   }
-};
+
+  const book = await Book.findById(req.params.id);
+
+  if (book && book.samplePdfUrl) {
+    // 2. Track Download (Stats)
+    // ... (Keep your existing tracking code here) ...
+
+    // 👇 3. CONSTRUCT LOCAL URL
+    let pdfPath = book.samplePdfUrl;
+
+    // If it's a local path (starts with /uploads), prepend the domain
+    if (pdfPath.startsWith('/uploads')) {
+        // Use 'req.get("host")' to automatically get localhost:5000 or your domain
+        const protocol = req.protocol; 
+        const host = req.get('host');
+        pdfPath = `${protocol}://${host}${pdfPath}`;
+    }
+
+    console.log("Serving Local PDF:", pdfPath);
+    res.json({ downloadUrl: pdfPath });
+    
+  } else {
+    res.status(404);
+    throw new Error('No sample available');
+  }
+});

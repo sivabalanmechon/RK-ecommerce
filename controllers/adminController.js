@@ -9,11 +9,11 @@ const SampleDownload = require('../models/SampleDownload');
 const getAdminStats = async (req, res) => {
   try {
     // 1. Basic Counts
-    const totalOrders = await Order.countDocuments();
+    const totalOrders = await Order.countDocuments({ isPaid: true });
     const totalUsers = await User.countDocuments();
     const totalBooks = await Book.countDocuments();
     
-    // 👇 2. NEW: Count Sample Downloads
+    // 2. Count Sample Downloads
     const totalSampleDownloads = await SampleDownload.countDocuments(); 
 
     // 3. Cart Items Aggregation
@@ -35,7 +35,7 @@ const getAdminStats = async (req, res) => {
     ]);
     const totalRevenue = totalRevenueResult.length > 0 ? totalRevenueResult[0].total : 0;
 
-    // (Yearly/Monthly revenue logic remains the same...)
+    // Yearly / Monthly Revenue
     const currentYear = new Date().getFullYear();
     const yearlyRevenueResult = await Order.aggregate([
       { $match: { isPaid: true, createdAt: { $gte: new Date(currentYear, 0, 1) } }},
@@ -84,17 +84,28 @@ const getAdminStats = async (req, res) => {
         console.log("Analytics Error:", err.message);
     }
 
+    // 👇 ✨ ROBUST UNPAID COUNT ✨
+    // This checks for: isPaid is FALSE OR isPaid DOES NOT EXIST OR isPaid is NULL
+    const totalUnpaidOrders = await Order.countDocuments({
+        $or: [
+            { isPaid: false },
+            { isPaid: { $exists: false } },
+            { isPaid: null }
+        ]
+    });
+
     res.status(200).json({
       totalOrders,
       totalUsers,
       totalBooks,
       totalCartItems,
-      totalSampleDownloads, // 👈 Send this new stat
+      totalSampleDownloads,
       totalRevenue,
       yearlyRevenue,
       monthlyRevenue,
       monthlySales,
-      bookAnalytics
+      bookAnalytics,
+      totalUnpaidOrders // Sending the robust count
     });
 
   } catch (error) {
@@ -103,19 +114,15 @@ const getAdminStats = async (req, res) => {
   }
 };
 
-module.exports = { getAdminStats };
-
 // @desc    Get list of all sample downloads
 // @route   GET /api/admin/sample-downloads
 // @access  Private/Admin
 const getSampleDownloads = async (req, res) => {
   try {
     const downloads = await SampleDownload.find({})
-      // 👇 Key Step: Get User Profile Details
       .populate('user', 'name email mobile profileImage') 
-      // Get Book Title (in case book name changed)
       .populate('book', 'title coverImage') 
-      .sort({ downloadedAt: -1 }); // Newest first
+      .sort({ downloadedAt: -1 }); 
 
     res.json(downloads);
   } catch (error) {

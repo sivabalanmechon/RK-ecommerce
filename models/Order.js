@@ -15,6 +15,11 @@ const orderSchema = mongoose.Schema({
   totalPrice: { type: Number, required: true },
   isPaid: { type: Boolean, required: true, default: false },
   paidAt: { type: Date },
+
+  paymentProof: {
+      type: String, // To store the UTR entered by user
+      default: ''
+    }
 }, { timestamps: true });
 
 module.exports = mongoose.model('Order', orderSchema);

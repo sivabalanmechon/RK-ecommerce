@@ -1,18 +1,33 @@
 const User = require('../models/User');
 const Order = require('../models/Order'); // 👈 1. IMPORT ORDER MODEL
+const asyncHandler = require('express-async-handler');
+const mongoose = require('mongoose');
 
 // @desc    Get User Profile (with Order History)
 // @route   GET /api/users/profile
 // @access  Private
 exports.getUserProfile = async (req, res) => {
   try {
-    // 1. Get User Details (and cart items)
-    const user = await User.findById(req.user._id)
-      .populate('cart.book'); 
+    // 1. Get User Details
+    const user = await User.findById(req.user._id).populate('cart.book');
 
     if (user) {
-      // 2. Manual lookup: Find orders belonging to this user
-      const orders = await Order.find({ user: user._id });
+      // 2. FIND PAID ORDERS
+      const rawOrders = await Order.find({ user: user._id, isPaid: true })
+                                   .sort({ createdAt: -1 })
+                                   .populate('orderItems.book'); 
+
+      // 3. ✨ TRICK: Flatten the data for the Frontend
+      // The frontend expects 'order.book', but DB has 'order.orderItems'
+      // We grab the first book from the items and put it at the top.
+      const formattedOrders = rawOrders.map(order => {
+          const orderObj = order.toObject();
+          if (orderObj.orderItems && orderObj.orderItems.length > 0) {
+              // Take the book from the first item and make it accessible as 'order.book'
+              orderObj.book = orderObj.orderItems[0].book;
+          }
+          return orderObj;
+      });
 
       res.json({
         _id: user._id,
@@ -21,13 +36,13 @@ exports.getUserProfile = async (req, res) => {
         mobile: user.mobile,
         role: user.role,
         cart: user.cart,
-        orders: orders // 👈 Attach orders here manually
+        orders: formattedOrders // 👈 Send the fixed orders
       });
     } else {
       res.status(404).json({ message: 'User not found' });
     }
   } catch (error) {
-    console.error(error); // Log error to console for debugging
+    console.error(error);
     res.status(500).json({ message: error.message });
   }
 };
@@ -107,17 +122,72 @@ exports.removeFromCart = async (req, res) => {
   }
 };
 
+
+// @desc    Get user cart (Auto-removes broken items)
+// @route   GET /api/users/cart
+// @access  Private
+exports.getUserCart = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.user._id);
+
+  if (user) {
+    const validItems = [];
+    const newCart = []; 
+
+    for (const cartItem of user.cart) {
+      // Find the book manually
+      const book = await mongoose.model('Book').findById(cartItem.book);
+
+      if (book) {
+        // 🛠️ PRICE FIX LOGIC:
+        // 1. Try 'price' (Standard)
+        // 2. Try 'sellingPrice' (If saved differently)
+        // 3. Fallback to 'originalPrice' (So it's never 0)
+        let finalSellingPrice = book.price || book.sellingPrice || book.originalPrice || 0;
+
+        validItems.push({
+          _id: book._id,
+          title: book.title,
+          coverImage: book.coverImage,
+          
+          // Force send a value, even if it falls back to originalPrice
+          sellingPrice: finalSellingPrice, 
+          
+          originalPrice: book.originalPrice || (finalSellingPrice * 1.2),
+          author: book.author || "RK Success",
+          qty: 1
+        });
+        
+        newCart.push(cartItem);
+      }
+    }
+
+    // Clean DB if needed
+    if (newCart.length !== user.cart.length) {
+      user.cart = newCart;
+      await user.save();
+    }
+
+    res.json(validItems);
+  } else {
+    res.status(404);
+    throw new Error('User not found');
+  }
+});
+
 // @desc    Get all users
 // @route   GET /api/users
 // @access  Private/Admin
 exports.getUsers = async (req, res) => {
   try {
     const users = await User.find({})
-      .select('-password')
-      .populate('cart.book')
-      .sort({ createdAt: -1 });
+      .select('-password')        // 1. Hide passwords
+      .sort({ createdAt: -1 })    // 2. Newest users first
+      .populate('cart.book')      // 3. Fill Book details in Cart
+      .populate('sampleDownloads'); // 4. Fill the Download History (Virtual Field)
+
     res.json(users);
   } catch (error) {
+    console.error(error); // Helpful to see the error in terminal
     res.status(500).json({ message: error.message });
   }
 };
