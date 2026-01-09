@@ -190,34 +190,43 @@ exports.getTopBooks = async (req, res) => {
 // @route   GET /api/books/:id/sample
 // @access  Private
 exports.downloadSample = asyncHandler(async (req, res) => {
-  // 1. Auth Check
+  // 1. Auth Check (Crucial for tracking "Who")
   if (!req.user) {
       res.status(401);
-      throw new Error('Not authorized');
+      throw new Error('Please login to download samples');
   }
 
   const book = await Book.findById(req.params.id);
 
   if (book && book.samplePdfUrl) {
-    // 2. Track Download (Stats)
-    // ... (Keep your existing tracking code here) ...
+    
+    // 👇 2. LOG THE DOWNLOAD TO DB
+    try {
+        await SampleDownload.create({
+            user: req.user._id,
+            book: book._id,
+            bookTitle: book.title
+        });
+        console.log(`📝 Logged download: ${req.user.name} -> ${book.title}`);
+    } catch (error) {
+        // If logging fails, don't stop the user from downloading. Just log the error.
+        console.error("❌ Failed to log download:", error.message);
+    }
 
-    // 👇 3. CONSTRUCT LOCAL URL
+    // 3. Construct URL
     let pdfPath = book.samplePdfUrl;
 
     // If it's a local path (starts with /uploads), prepend the domain
     if (pdfPath.startsWith('/uploads')) {
-        // Use 'req.get("host")' to automatically get localhost:5000 or your domain
         const protocol = req.protocol; 
         const host = req.get('host');
         pdfPath = `${protocol}://${host}${pdfPath}`;
     }
 
-    console.log("Serving Local PDF:", pdfPath);
     res.json({ downloadUrl: pdfPath });
     
   } else {
     res.status(404);
-    throw new Error('No sample available');
+    throw new Error('No sample available for this book');
   }
 });

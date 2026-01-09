@@ -1,14 +1,13 @@
 const Order = require('../models/Order');
 const asyncHandler = require('express-async-handler'); // Ensure you have this installed: npm i express-async-handler
 const Transaction = require('../models/transactionalModel');
+const Book = require('../models/Book'); // 1. Import Book Model
+const { grantAccess } = require('../utils/driveService'); // 2. Import Drive Service
 
 // @desc    Create new order
 // @route   POST /api/orders
 // @access  Private
 // backend/controllers/orderController.js
-
-// backend/controllers/orderController.js
-
 const createOrder = asyncHandler(async (req, res) => {
   const {
     orderItems,
@@ -102,29 +101,30 @@ const getOrderById = asyncHandler(async (req, res) => {
   }
 });
 
- const updateOrderToPaid = asyncHandler(async (req, res) => {
-  const order = await Order.findById(req.params.id);
+
+// @desc    Update order to paid (Manual or Auto-Verify)
+// @route   PUT /api/orders/:id/pay
+// @access  Private
+const updateOrderToPaid = asyncHandler(async (req, res) => {
+  // 1. Populate user to ensure we have the email
+  const order = await Order.findById(req.params.id).populate('user', 'email name');
 
   if (order) {
-    // 1. Get User Input (Clean it)
     const userInput = req.body.paymentProof ? req.body.paymentProof.trim() : '';
     
-    // 2. Validation: Ensure at least 6 digits
     if (userInput.length < 6) {
         res.status(400);
         throw new Error('Please enter at least the last 6 digits of the UTR.');
     }
 
-    // 3. SEARCH: Find an unused transaction ending with these digits
-    // AND matching the order amount (Critical for security!)
     const matchedTransaction = await Transaction.findOne({
-      utr: { $regex: userInput + '$' }, // regex '$' means "ends with"
-      amount: order.totalPrice,         // Security: Amount must match exactly
-      isUsed: false                     // Security: Must not be used before
+      utr: { $regex: userInput + '$' }, 
+      amount: order.totalPrice,         
+      isUsed: false                     
     });
 
     if (matchedTransaction) {
-        // ✅ SUCCESS: Found a matching SMS!
+        // ✅ SUCCESS
         order.isPaid = true;
         order.paidAt = Date.now();
         order.paymentMethod = 'UPI_AUTO_VERIFIED';
@@ -135,22 +135,39 @@ const getOrderById = asyncHandler(async (req, res) => {
             email_address: order.user.email,
         };
 
-        // Mark transaction as used so nobody else can steal it
         matchedTransaction.isUsed = true;
         matchedTransaction.orderId = order._id;
         await matchedTransaction.save();
         
-        // 🚀 AUTOMATION: Grant Google Drive Access
+        // 🚀 AUTOMATION: GRANT ACCESS
+        console.log(`🔄 Automation Starting for Order #${order._id}`);
+        
         if (order.orderItems && order.orderItems.length > 0) {
-             const { grantAccess } = require('../utils/driveService');
-             // Loop through items and grant access logic here...
-             // (Assuming you have the book/drive ID logic setup)
+             for (const item of order.orderItems) {
+                 try {
+                     const book = await Book.findById(item.product || item.book);
+
+                     // ✨ FIX: Using the correct field name 'googleDriveFileId'
+                     if (book && book.googleDriveFileId) {
+                         console.log(`📂 Found Drive ID: ${book.googleDriveFileId}. Granting to: ${order.user.email}`);
+                         
+                         await grantAccess(book.googleDriveFileId, order.user.email);
+                         
+                         console.log(`✅ Access Granted successfully for ${book.title}`);
+                     } else {
+                         console.log(`⚠️ Skipping item: No 'googleDriveFileId' found for "${book ? book.title : 'Unknown Book'}"`);
+                         // Debug log to help if it happens again
+                         if(book) console.log("   (Available fields in DB:", Object.keys(book.toObject()), ")");
+                     }
+                 } catch (err) {
+                     console.error(`❌ Failed to grant access for item:`, err.message);
+                 }
+             }
         }
 
-        console.log(`✅ Order #${order._id} verified with partial UTR: ...${userInput}`);
+        console.log(`✅ Order verified & processed.`);
     } else {
-        // ❌ FAIL: No matching SMS found yet
-        // Save it as manual pending so you can check later
+        // ❌ FAIL
         order.paymentProof = userInput;
         order.paymentMethod = 'UPI_MANUAL_PENDING';
         console.log(`⚠️ User entered ${userInput}, but no matching SMS found yet.`);
@@ -171,8 +188,10 @@ const getOrderById = asyncHandler(async (req, res) => {
 const handleSmsWebhook = asyncHandler(async (req, res) => {
     const { utr, amount, secretKey } = req.body;
 
+    console.log("📩 SMS Webhook Received:", req.body);
+
     // 1. Security Check
-    if (secretKey !== 'my-secret-admin-key-123') {
+    if (secretKey !== 'rkenotes6394') {
         res.status(401);
         throw new Error('Unauthorized Bot');
     }
