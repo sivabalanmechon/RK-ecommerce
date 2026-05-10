@@ -72,9 +72,9 @@ exports.loginUser = async (req, res) => {
 
   // Check Global Login Switch
   const settings = await SystemSetting.findOne();
-  if (settings && !settings.isLoginEnabled) {
-      return res.status(503).json({ message: 'Login is currently disabled by Administrator.' });
-  }
+  // if (settings && !settings.isLoginEnabled) {
+  //     return res.status(503).json({ message: 'Login is currently disabled by Administrator.' });
+  // }
 
   try {
     const user = await User.findOne({ email }).populate('cart.book');
