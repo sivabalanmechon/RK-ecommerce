@@ -1,15 +1,17 @@
 const express = require('express');
 const router = express.Router();
-const { verifySmsPayment, submitManualPayment } = require('../controllers/paymentController');
 const { protect } = require('../middleware/authMiddleware');
 
 // Both routes must be protected (User must be logged in to pay)
 // router.post('/create-order', protect, createOrder);
 // router.post('/verify', protect, verifyPayment);
+const {
+    createOrder,
+    verifyPayment
+} = require("../controllers/paymentController");
 
-router.post('/verify-sms', verifySmsPayment);
+router.post("/create-order", protect, createOrder);
 
-// Route for Web Frontend (User must be logged in to submit UTR)
-router.put('/:id/pay', protect, submitManualPayment);
+router.post("/verify", protect, verifyPayment);
 
 module.exports = router;
