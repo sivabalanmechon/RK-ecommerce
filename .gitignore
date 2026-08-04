@@ -11,6 +11,8 @@ dist/
 build/
 
 # Uploads & Logs
+uploads/
+backend/uploads/
 logs/
 npm-debug.log
 

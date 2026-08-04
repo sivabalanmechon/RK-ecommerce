@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { protect } = require('../middleware/authMiddleware');
 
+
 // Both routes must be protected (User must be logged in to pay)
 // router.post('/create-order', protect, createOrder);
 // router.post('/verify', protect, verifyPayment);
@@ -10,7 +11,7 @@ const {
     verifyPayment
 } = require("../controllers/paymentController");
 
-router.post("/create-order", protect, createOrder);
+router.post("/create-order", createOrder);
 
 router.post("/verify", protect, verifyPayment);
 
