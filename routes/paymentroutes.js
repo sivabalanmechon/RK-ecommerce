@@ -3,7 +3,7 @@ const router = express.Router();
 const { protect } = require('../middleware/authMiddleware');
 
 // Import controller functions
-const { createOrder, verifyPayment } = require("../controllers/paymentController");
+const { createOrder, verifyPayment } = require("../controllers/paymentcontroller");
 
 // ✅ Test route without auth middleware
 router.post("/create-order-test", (req, res) => {

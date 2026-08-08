@@ -31,9 +31,9 @@ app.use('/api/books', require('./routes/bookroutes'));
 app.use('/api/users', require('./routes/userroutes'));
 app.use('/api/settings', require('./routes/settingsRoutes'));
 app.use('/api/admin', require('./routes/adminRoutes'));
-app.use('/api/orders', require('./routes/orderRoutes'));
+app.use('/api/orders', require('./routes/orderroutes'));
 app.use('/api/upload', require('./routes/uploadRoutes'));
-app.use('/api/payments', require('./routes/paymentroutes'));
+app.use('/api/payments', require('./routes/paymentRoutes'));
 
 const dirname = path.resolve();
 app.use('/uploads', express.static(path.join(dirname, '/uploads')));
