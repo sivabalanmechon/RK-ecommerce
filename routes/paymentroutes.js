@@ -11,7 +11,7 @@ router.post("/create-order-test", (req, res) => {
 });
 
 // ✅ Actual routes (temporarily without protect)
-router.post("/create-order", createOrder);
-router.post("/verify", verifyPayment);
+router.post("/create-orders", protect, createOrder);
+router.post("/verify", protect, verifyPayment);
 
 module.exports = router;
