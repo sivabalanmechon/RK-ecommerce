@@ -27,12 +27,13 @@ app.use(cors({
 // Placeholder Routes (We will create these files next)
 app.use('/api/auth', require('./routes/authroutes'));
 app.use('/api/books', require('./routes/bookroutes'));
-app.use('/api/payment', require('./routes/paymentroutes'));
+
 app.use('/api/users', require('./routes/userroutes'));
 app.use('/api/settings', require('./routes/settingsRoutes'));
 app.use('/api/admin', require('./routes/adminRoutes'));
 app.use('/api/orders', require('./routes/orderRoutes'));
 app.use('/api/upload', require('./routes/uploadRoutes'));
+app.use('/api/payments', require('./routes/paymentroutes'));
 
 const dirname = path.resolve();
 app.use('/uploads', express.static(path.join(dirname, '/uploads')));
